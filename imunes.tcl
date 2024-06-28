@@ -255,13 +255,25 @@ set cf::clipboard::dict_cfg [dict create]
 set cfg_list {}
 set curcfg ""
 
-#****v* imunes.tcl/editor_only
+#****v* imunes.tcl/.imunes.rc
 # NAME
-#    editor_only -- if set, Experiment -> Execute is disabled
+#    editor_only -- if true, Experiment -> Execute is disabled
+#    recents_number -- total number of recently opened file names to keep
 # FUNCTION
-#    IMUNES GUI can be used in editor-only mode.i
-#    This variable can be modified in .imunesrc.
-set editor_only false
+#    These variables can be modified in .imunes.rc in JSON format:
+#    {
+#    	"editor_only": true
+#    	"recents_number": "20"
+#    }
+#***
+set configurable_options {
+    "recents_number"		10
+    "editor_only"		false
+}
+
+foreach {option val} $configurable_options {
+    set $option $val
+}
 
 set winOS false
 if { $isOSwin } {
@@ -281,11 +293,22 @@ if { [string match -nocase "*imagemagick*" $imInfo] != 1 } {
 
 set runtimeDir "/var/run/imunes"
 
-#
-# Read config files, the first one found: .imunesrc, $HOME/.imunesrc
-#
-# XXX
-readConfigFile
+set home_path ""
+catch { set home_path $env(HOME) }
+
+set config_path ""
+catch { set config_path $env(XDG_CONFIG_HOME) }
+if { $config_path == "" } {
+    set config_path "$home_path/.config"
+}
+set config_path "$config_path/imunes"
+file mkdir $config_path
+
+# TODO: check what if user is sudo
+set sudo_user ""
+catch { set sudo_user $env(SUDO_USER) }
+# Read config files
+readConfigFiles
 
 #
 # Initialization should be complete now, so let's start doing something...
