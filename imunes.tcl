@@ -308,6 +308,7 @@ file mkdir $config_path
 set sudo_user ""
 catch { set sudo_user $env(SUDO_USER) }
 
+set pinned_recent_files {}
 set recent_files {}
 set recents_fname "$config_path/recents"
 if { ! [file isdirectory "$config_path"] } {
@@ -320,7 +321,13 @@ if { ! [file isdirectory "$config_path"] } {
 
 	set fnames [split $data \n]
 	foreach fname $fnames {
-	    if { $fname != "" } {
+	    if { $fname == "" } {
+		continue
+	    }
+
+	    if { [string match "!*" $fname] } {
+		lappend pinned_recent_files $fname
+	    } else {
 		lappend recent_files $fname
 	    }
 	}
