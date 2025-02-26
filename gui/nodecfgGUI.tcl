@@ -2141,15 +2141,30 @@ proc configGUI_servicesConfig { wi node_id } {
 #****
 proc configGUI_attachDockerToExt { wi node_id } {
     global isOSlinux
-
-    if { ! $isOSlinux } {
-	return
-    }
+    global isOSfreebsd
 
     global guielements
     lappend guielements configGUI_attachDockerToExt
 
-    global docker_enable node_cfg
+    global docker_enable layer_enable  node_cfg
+
+    set layer_enable [string map {"" 0 true 1} [_getNodeLayerEnable $node_cfg]]
+
+    set w $wi.layers
+    ttk::frame $w -relief groove -borderwidth 2 -padding 2
+    ttk::label $w.label -text "Enable layers:"
+
+    pack $w.label -side left -padx 2
+
+    ttk::checkbutton $w.chkbox -text "Enabled" -variable layer_enable
+    pack $w.chkbox -side left -padx 7
+
+    ttk::button $w.layer_options -text "Layer options" \
+    -command "layerOptionsGUI $node_id"
+    pack $w.layer_options -side left -padx 7
+
+    pack $w -fill both
+
 
     set docker_enable [string map {"" 0 true 1} [_getNodeDockerAttach $node_cfg]]
 
@@ -2167,6 +2182,235 @@ proc configGUI_attachDockerToExt { wi node_id } {
     pack $w.docker_options -side left -padx 7
 
     pack $w -fill both
+}
+
+proc layerOptionsGUI { node_id } {
+    set wi .layer_options_layers
+
+    catch { destroy $wi }
+    tk::toplevel $wi
+
+    try {
+	grab $wi
+    } on error {} {
+	catch { destroy $wi }
+	return
+    }
+
+    global node_cfg layer_options_layers
+
+    set layer_options_layers {}
+    set cfg_layers [_getNodeLayerOptions $node_cfg "layers"]
+
+    set index 0
+    foreach cfg_layer $cfg_layers {
+	dict set layer_options_layers $index $cfg_layer
+
+	incr index
+    }
+
+    wm title $wi "Layer options for node '[_getNodeName $node_cfg]' ($node_id)"
+    wm minsize $wi 584 445
+    wm resizable $wi 0 1
+
+    set notebook $wi.notebook
+    ttk::notebook $notebook
+
+    # Layers tab
+    set layers $notebook.layers
+    ttk::frame $layers
+    $notebook add $layers -text "Available layers"
+
+    set layer_add_btn $layers.add_button
+    ttk::button $layer_add_btn -text "Add" -width 120
+    grid $layer_add_btn -row 0 -column 0 -columnspan 6 -in $layers -sticky "" -pady 4
+    $layer_add_btn configure -command \
+    "
+	layerOption_save $layers ignore
+	layerOption_addElem
+	layerOptionGUI_refresh $layers
+    "
+
+    # redraw header and existing elements
+    layerOptionGUI_refresh $layers
+
+    # Buttons
+    set bottom $wi.bottom
+    ttk::frame $bottom
+    set buttons $wi.bottom.buttons
+    ttk::frame $buttons -borderwidth 2
+
+    ttk::button $buttons.apply -text "Apply" \
+	-command "saveLayerOptions $notebook"
+    ttk::button $buttons.applyClose -text "Apply and Close" \
+	-command "if { \[saveLayerOptions $notebook\] == \"\" } { destroy $wi }"
+    ttk::button $buttons.cancel -text "Cancel" -command "destroy $wi"
+
+    grid $buttons.apply -row 0 -column 1 -sticky swe -padx 2
+    grid $buttons.applyClose -row 0 -column 2 -sticky swe -padx 2
+    grid $buttons.cancel -row 0 -column 3 -sticky swe -padx 2
+
+    pack $notebook -fill both -expand 1
+    pack $bottom -fill both -side bottom
+    pack $buttons -pady 2
+}
+
+proc saveLayerOptions { notebook } {
+    global node_cfg layer_options_layers
+    set layers $notebook.layers
+    set err [layerOption_save $layers]
+    if { $err != "" } {
+	$notebook select $layers
+	focus $layers
+
+	after idle {.dialog1.msg configure -wraplength 4i}
+	tk_dialog .dialog1 "Error in layers" $err info 0 Dismiss
+
+	return $err
+    }
+
+    set layers [dict values $layer_options_layers]
+    set node_cfg [_setNodeLayerOptions $node_cfg "layers" $layers]
+
+    return
+}
+
+proc layerOption_addElem {} {
+    global layer_options_layers
+
+    if { [dict size $layer_options_layers] == 0 } {
+	set index 0
+    } else {
+	set index [expr [lindex [lsort -integer [dict keys $layer_options_layers]] end] + 1]
+    }
+
+    set elem [dict create]
+    dict set elem "enabled" 1
+    dict set elem "src" ""
+    dict set elem "readonly" 1
+    dict set layer_options_layers $index $elem
+    puts "ADDED EMPTY TO $index: '$elem'"
+    puts "NEW [dict get $layer_options_layers]"
+}
+
+proc layerOption_removeElem { index } {
+    global layer_options_layers
+
+    dict unset layer_options_layers $index
+
+    puts "REMOVED Layers '$index'"
+    puts "NEW [dict get $layer_options_layers]"
+}
+
+
+proc layerOption_save { layers { ignore_errors "" } } {
+    global layer_options_layers
+
+    set changed 0
+    set content $layers.content
+    set checkbutton_dict "0 !selected 1 selected"
+
+    set error_state ""
+    foreach index [lsort -integer [dict keys $layer_options_layers]] {
+	set err ""
+	set layer [dict get $layer_options_layers $index]
+	foreach key "enabled src readonly" {
+	    set $key [dict get $layer "$key"]
+	}
+
+	set elem $content.enabled$index
+	set new_enabled [expr {"selected" in [$elem state]}]
+
+
+	set elem $content.src$index
+	set new_src [$elem get]
+
+	set elem $content.readonly$index
+	set new_readonly [expr {"selected" in [$elem state]}]
+
+	if { $err != "" && $ignore_errors != "ignore" } {
+	    set error_state "Option ($index): $err"
+	    break
+	}
+
+	foreach varname "enabled src readonly" {
+	    if { [set new_$varname] != [set $varname] } {
+		set $varname [set new_$varname]
+		set changed 1
+	    }
+	}
+
+	if { $changed } {
+	    set new_layer [dict create]
+	    foreach key "enabled src readonly" {
+		dict set new_layer "$key" [set $key]
+	    }
+
+	    dict set layer_options_layers $index $new_layer
+	}
+    }
+
+    return $error_state
+}
+
+proc layerOptionGUI_refresh { layers } {
+    global layer_options_layers
+
+    set content $layers.content
+    catch { destroy $content }
+    ttk::frame $content -relief groove -borderwidth 2 -padding 2
+    grid $content -in $layers -sticky nsew -pady 4 -columnspan 6
+
+    set padx 0
+
+    ttk::label $content.h_enabled -text "Enabled"
+    ttk::label $content.h_src -text "Source"
+    ttk::label $content.h_readonly -text "Readonly"
+    ttk::label $content.h_del -text ""
+
+    grid $content.h_enabled -row 0 -column 0 -in $content -sticky "" -padx $padx
+    grid columnconfigure $content $content.h_enabled -weight 1
+    grid $content.h_src -row 0 -column 2 -in $content -sticky "" -padx $padx
+    grid columnconfigure $content $content.h_src -weight 3
+    grid $content.h_readonly -row 0 -column 4 -in $content -sticky "" -padx $padx
+    grid columnconfigure $content $content.h_readonly -weight 1
+    grid $content.h_del -row 0 -column 5 -in $content -sticky "" -padx $padx
+    grid columnconfigure $content $content.h_del -weight 1
+
+    # skip header row
+    set row 1
+    set checkbutton_dict "0 !selected 1 selected"
+    foreach index [lsort -integer [dict keys $layer_options_layers]] {
+	set layer [dict get $layer_options_layers $index]
+	set enabled [dict get $layer "enabled"]
+	set src [dict get $layer "src"]
+	set readonly [dict get $layer "readonly"]
+
+	ttk::checkbutton $content.enabled$index -text "($index)"
+	$content.enabled$index state [dict get $checkbutton_dict $enabled]
+
+	ttk::entry $content.src$index -width 34
+	$content.src$index insert 0 $src
+
+	ttk::checkbutton $content.readonly$index
+	$content.readonly$index state [dict get $checkbutton_dict $readonly]
+
+	ttk::button $content.del$index -text "Delete ($index)" -command \
+	"
+	    layerOption_removeElem $index
+	    layerOption_save $layers ignore
+	    layerOptionGUI_refresh $layers
+	"
+
+	grid $content.enabled$index -row $row -column 0 -in $content -sticky "" -padx $padx
+	grid $content.src$index -row $row -column 2 -in $content -sticky "" -padx $padx
+	grid $content.readonly$index -row $row -column 4 -in $content -sticky "" -padx $padx
+	grid $content.del$index -row $row -column 5 -in $content -sticky "" -padx $padx
+
+	incr row
+    }
+
+    grid columnconfigure $content "all" -uniform allTheSame
 }
 
 proc dockerOptionsGUI { node_id } {
@@ -2269,11 +2513,13 @@ proc saveDockerOptions { notebook } {
 proc dockerOptionVolumes_addElem {} {
     global dockeroptions_volumes
 
+
     if { [dict size $dockeroptions_volumes] == 0 } {
 	set index 0
     } else {
 	set index [expr [lindex [lsort -integer [dict keys $dockeroptions_volumes]] end] + 1]
     }
+    puts "dockeroptions_volumes $dockeroptions_volumes"
 
     set elem [dict create]
     dict set elem "enabled" 1
@@ -3299,12 +3545,19 @@ proc configGUI_servicesConfigApply { wi node_id } {
 #   * node_id -- node id
 #****
 proc configGUI_attachDockerToExtApply { wi node_id } {
-    global changed docker_enable
+    global changed docker_enable layer_enable
     global node_cfg
 
     set docker_enable_str [string map {0 "" 1 true} $docker_enable]
     if { [_getNodeDockerAttach $node_cfg] != $docker_enable_str } {
 	set node_cfg [_setNodeDockerAttach $node_cfg $docker_enable_str]
+	set changed 1
+    }
+
+    puts "layer_enable $layer_enable"
+    set layer_enable_str [string map {0 "" 1 true} $layer_enable]
+    if { [_getNodeLayerEnable $node_cfg] != $layer_enable_str } {
+	set node_cfg [_setNodeLayerEnable $node_cfg $layer_enable_str]
 	set changed 1
     }
 }
@@ -7941,6 +8194,14 @@ proc _setNodeDockerAttach { node_cfg state } {
     return [_cfgSet $node_cfg "docker_attach" $state]
 }
 
+proc _getNodeLayerEnable { node_cfg } {
+    return [_cfgGetWithDefault "false" $node_cfg "layer_enable"]
+}
+
+proc _setNodeLayerEnable { node_cfg state } {
+    return [_cfgSet $node_cfg "layer_enable" $state]
+}
+
 proc _getNodeIPsec { node_cfg } {
     return [_cfgGet $node_cfg "ipsec" "ipsec_configs"]
 }
@@ -8024,4 +8285,13 @@ proc _getNodeDockerOptions { node_cfg type } {
 
 proc _setNodeDockerOptions { node_cfg type new_value } {
     return [_cfgSet $node_cfg "docker_options" $type $new_value]
+}
+
+
+proc _getNodeLayerOptions { node_cfg type } {
+    return [_cfgGet $node_cfg "layer_options" $type]
+}
+
+proc _setNodeLayerOptions { node_cfg type new_value } {
+    return [_cfgSet $node_cfg "layer_options" $type $new_value]
 }

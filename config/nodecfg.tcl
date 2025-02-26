@@ -1588,6 +1588,16 @@ proc getNodeDockerAttach { node_id } {
     return [cfgGetWithDefault "false" "nodes" $node_id "docker_attach"]
 }
 
+proc setNodeDockerAttach { node_id state } {
+    cfgSet "nodes" $node_id "docker_attach" $state
+
+    trigger_nodeRecreate $node_id
+}
+
+proc getNodeLayerEnable { node_id } {
+    return [cfgGetWithDefault "false" "nodes" $node_id "layer_enable"]
+}
+
 #****f* nodecfg.tcl/setNodeDockerAttach
 # NAME
 #   setNodeDockerAttach -- set node docker ext iface attach.
@@ -1599,8 +1609,8 @@ proc getNodeDockerAttach { node_id } {
 #   * node_id -- node id
 #   * state -- attach status
 #****
-proc setNodeDockerAttach { node_id state } {
-    cfgSet "nodes" $node_id "docker_attach" $state
+proc setNodeLayerEnable { node_id state } {
+    cfgSet "nodes" $node_id "layer_enable" $state
 
     trigger_nodeRecreate $node_id
 }
@@ -1822,6 +1832,15 @@ proc getNodeDockerOptions { node_id type } {
 
 proc setNodeDockerOptions { node_id type new_value } {
     cfgSet "nodes" $node_id "docker_options" $type $new_value
+}
+
+proc getNodeLayerOptions { node_id type } {
+    return [cfgGet "nodes" $node_id "layer_options" $type]
+}
+
+proc setNodeLayerOptions { node_id type new_value } {
+	trigger_nodeRecreate $node_id
+    cfgSet "nodes" $node_id "layer_options" $type $new_value
 }
 
 proc getNodeFromHostname { hostname } {
@@ -2083,6 +2102,9 @@ proc updateNode { node_id old_node_cfg new_node_cfg } {
 	    "docker_attach" {
 		setNodeDockerAttach $node_id $new_value
 	    }
+	    "layer_enable" {
+		setNodeLayerEnable $node_id $new_value
+	    }
 
 	    "croutes4" {
 		setStatIPv4routes $node_id $new_value
@@ -2101,6 +2123,7 @@ proc updateNode { node_id old_node_cfg new_node_cfg } {
 	    }
 
 	    "docker_options" {
+	    puts "old $old_value new $new_value"
 		set docker_options_diff [dictDiff $old_value $new_value]
 		dict for {docker_options_key docker_options_change} $docker_options_diff {
 		    if { $docker_options_change == "copy" } {
@@ -2124,6 +2147,34 @@ proc updateNode { node_id old_node_cfg new_node_cfg } {
 		    } else {
 			dputs "setNodeDockerOptions $node_id $docker_options_key $docker_options_new_value"
 			setNodeDockerOptions $node_id $docker_options_key $docker_options_new_value
+		    }
+		}
+	    }
+
+	    "layer_options" {
+		set layer_options_diff [dictDiff $old_value $new_value]
+		dict for {layer_options_key layer_options_change} $layer_options_diff {
+		    if { $layer_options_change == "copy" } {
+			continue
+		    }
+
+		    dputs "======== $layer_options_change: '$layer_options_key'"
+
+		    set layer_options_old_value [_cfgGet $old_value $layer_options_key]
+		    set layer_options_new_value [_cfgGet $new_value $layer_options_key]
+		    if { $layer_options_change in "changed" } {
+			dputs "======== OLD: '$layer_options_old_value'"
+		    }
+		    if { $layer_options_change in "new changed" } {
+			dputs "======== NEW: '$layer_options_new_value'"
+		    }
+
+		    if { $layer_options_change == "removed" } {
+			dputs "setNodeLayerOptions $node_id $layer_options_key \"\""
+			setNodeLayerOptions $node_id $layer_options_key ""
+		    } else {
+			dputs "setNodeLayerOptions $node_id $layer_options_key $layer_options_new_value"
+			setNodeLayerOptions $node_id $layer_options_key $layer_options_new_value
 		    }
 		}
 	    }

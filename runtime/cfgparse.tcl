@@ -653,6 +653,12 @@ proc loadCfgLegacy { cfg } {
 			    cfgSet $dict_object $object "docker_attach" $docker_enable_str
 			    lappend $object "docker-attach $value"
 			}
+			layer-enable {
+			    cfgUnset $dict_object $object $field
+			    set layer_enable_str [string map {false "" true 1} $value]
+			    cfgSet $dict_object $object "layer_enable" $layer_enable_str
+			    lappend $object "layer-enable $value"
+			}
 			# for backwards compatibility
 			docker-image -
 			custom-image {
@@ -1705,13 +1711,13 @@ proc getImageProperty { image_id property } {
 # * array - JSON array
 # * inner_dictionary - dictionary inside of an object
 proc getJsonType { key_name } {
-    if { $key_name in "canvases nodes links annotations images custom_configs ipsec_configs ifaces IFACES_CONFIG NODE_CONFIG docker_options" } {
+    if { $key_name in "canvases nodes links annotations images custom_configs ipsec_configs ifaces IFACES_CONFIG NODE_CONFIG docker_options layer_options" } {
 	return "dictionary"
     } elseif { $key_name in "croutes4 croutes6 ipv4_addrs ipv6_addrs services events tayga_mappings" } {
 	return "array"
     } elseif { $key_name in "vlan ipsec nat64 packgen packets" } {
 	return "inner_dictionary"
-    } elseif { $key_name in "docker_volumes" } {
+    } elseif { $key_name in "docker_volumes layers" } {
 	return "dictionary_array"
     }
 

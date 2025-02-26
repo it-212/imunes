@@ -1211,6 +1211,7 @@ proc getVrootDir {} {
 #****
 proc prepareFilesystemForNode { node_id } {
     global vroot_unionfs vroot_linprocfs devfs_number
+    global cur_node_cfg
 
     set eid [getFromRunning "eid"]
 
@@ -1225,7 +1226,38 @@ proc prepareFilesystemForNode { node_id } {
 	pipesExec "mkdir -p $VROOT_RUNTIME" "hold"
 	pipesExec "mkdir -p $VROOT_OVERLAY" "hold"
 	pipesExec "mount_nullfs -o ro $VROOTDIR/vroot $VROOT_RUNTIME" "hold"
-	pipesExec "mount_unionfs -o noatime $VROOT_OVERLAY $VROOT_RUNTIME" "hold"
+
+	set layer_enable [cfgGetWithDefault false "nodes" $node_id "layer_enable"]
+
+	set readonly_last_layer 1
+	if { $layer_enable } {
+
+		set layer_options [cfgGet "nodes" $node_id "layer_options"]
+		if { $layer_options != ""} {
+
+			set layer_list [dict get $layer_options "layers"]
+			foreach layer_info $layer_list {
+				set layer_enable [dict get $layer_info "enabled"]
+				if { $layer_enable == 0 } {
+					continue
+				}
+
+				set layer_path [dict get $layer_info "src"]
+				if { [file exist $layer_path] } {
+					if { [file isdirectory $layer_path] } {
+						set readonly_last_layer [dict get $layer_info "readonly"]
+						puts "'[info level -1]' - '[info level 0]': $layer_path mount"
+						pipesExec "mount_unionfs -o noatime $layer_path $VROOT_RUNTIME" "hold"
+					}
+				} else {
+					puts "$layer_path does not exist. Skipping mount of $layer_path"
+				}
+			}
+		}
+	}
+	if { $readonly_last_layer == 1} {
+		pipesExec "mount_unionfs -o noatime $VROOT_OVERLAY $VROOT_RUNTIME" "hold"
+	}
     } else {
 	# ZFS
 	set VROOT_ZFS vroot/$eid/$node_id
@@ -1781,10 +1813,10 @@ proc removeNodeFS { eid node_id } {
     set VROOT_RUNTIME_DEV $VROOT_RUNTIME/dev
     pipesExec "umount -f $VROOT_RUNTIME_DEV" "hold"
     if { $vroot_unionfs } {
-	# 1st: unionfs RW overlay
-	pipesExec "umount -f $VROOT_RUNTIME" "hold"
-	# 2nd: nullfs RO loopback
-	pipesExec "umount -f $VROOT_RUNTIME" "hold"
+    catch { exec mount --libxo json | jq ".mount.mounted | map(select(.node == \"$VROOT_RUNTIME\")) | length" } layerCount
+	for { set i 0 } { $i < $layerCount } { incr i }	{
+		pipesExec "umount -f $VROOT_RUNTIME" "hold"
+	}
 	pipesExec "rmdir $VROOT_RUNTIME" "hold"
     }
 
