@@ -2242,3 +2242,19 @@ proc startRoutingDaemons { node_id } {
 
     pipesExec "docker exec -d [getFromRunning "eid"].$node_id sh -c '$cmds'" "hold"
 }
+
+proc startVM { eid node } {
+    #set node_cfg [_cfgGet node]
+    puts "node_cfg" 
+    #set cfg [_getNodeVMConfig $node_cfg]
+    
+    puts "cfg" 
+}
+
+proc killVM { eid node } {
+    set node_cfg [_cfgGet node]
+    puts "$node_cfg" 
+    set cfg [_getNodeVMConfig $node_cfg]
+    
+    puts "$cfg" 
+}
