@@ -2243,16 +2243,44 @@ proc startRoutingDaemons { node_id } {
     pipesExec "docker exec -d [getFromRunning "eid"].$node_id sh -c '$cmds'" "hold"
 }
 
-proc startVM { eid node } {
-    #set node_cfg [_cfgGet node]
-    puts "node_cfg" 
-    #set cfg [_getNodeVMConfig $node_cfg]
+proc startVM { eid node_id } {
+    puts $node_id
+    set node_cfg [cfgGet "nodes" $node_id]
+    set vm_cfg [_getNodeVMConfig $node_cfg]
+    set hdd_path [dict get $vm_cfg "hdd_path"]
+    set iso_path [dict get $vm_cfg "iso_path"]
+    set cpu_count [dict get $vm_cfg "cpu_count"]
+
+    if { [dict get $vm_cfg "create_hdd"] } {
+        set size [dict get $vm_cfg "create_hdd_size"]
+        # TODO: provjeri postoji li direktorij ([dirname $hdd_path])
+        puts "vidi mene stvaram hdd velicine $size na $hdd_path"
+    }
+    # TODO: provjeri postoji li HDD
+    # TODO: pokreni qemu
     
-    puts "cfg" 
+    set args ""
+    set args "$args -m [dict get $vm_cfg "memory_size"]"
+    if { $iso_path != "" } {
+        set args "$args -cdrom $iso_path -boot d"
+    }
+    set args "$args -smp $cpu_count"
+    set args "$args -hda $hdd_path"
+    set args "$args -cpu host"
+    set args "$args --enable-kvm"
+
+    foreach {iface_id iface_cfg} [cfgGet "nodes" $node_id "ifaces"] {
+        set name [dict get $iface_cfg "name"]
+        set mac [dict get $iface_cfg "mac"]
+        set args "$args -netdev tap,id=$name,ifname=$name,script=no,downscript=no -device virtio-net,netdev=$name,mac=$mac"
+    }
+
+    puts "qemu-system-x86_64 $args"
+    puts $node_cfg
 }
 
-proc killVM { eid node } {
-    set node_cfg [_cfgGet node]
+proc killVM { eid node_id } {
+    set node_cfg [cfgGet "nodes" $node_id]
     puts "$node_cfg" 
     set cfg [_getNodeVMConfig $node_cfg]
     

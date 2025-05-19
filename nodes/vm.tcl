@@ -323,6 +323,7 @@ proc $MODULE.prepareSystem {} {
 #   * node_id -- node id
 #****
 proc $MODULE.nodeCreate { eid node_id } {
+    startVM $eid $node_id
     prepareFilesystemForNode $node_id
     createNodeContainer $node_id
 }
