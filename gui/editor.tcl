@@ -229,7 +229,7 @@ proc listLANNodes { l2node_id l2peers } {
 	    continue
 	}
 
-	if { [[getNodeType $peer_id].netlayer] == "LINK" && [getNodeType $peer_id] != "rj45" } {
+	if { [[getNodeType $peer_id].netlayer] == "LINK" && [getNodeType $peer_id] ni "rj45 vm" } {
 	    if { $peer_id ni $l2peers } {
 		set l2peers [listLANNodes $peer_id $l2peers]
 	    }

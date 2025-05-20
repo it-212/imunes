@@ -105,6 +105,7 @@ foreach file [glob -directory $ROOTDIR/$LIBDIR/runtime *.tcl] {
 # bases for naming new nodes
 array set nodeNamingBase {
     pc pc
+    vm vm
     ext ext
     filter filter
     router router
@@ -141,7 +142,7 @@ foreach {option default_value} [concat $option_defaults $gui_option_defaults] {
 }
 
 # Set default node type list
-set node_types "lanswitch hub rj45 stpswitch filter packgen ext extnat router host pc nat64"
+set node_types "lanswitch hub rj45 stpswitch filter packgen ext extnat router host pc vm nat64"
 # Set default supported router models
 set supp_router_models "frr quagga static"
 

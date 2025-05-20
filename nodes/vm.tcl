@@ -22,8 +22,11 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
+# This work was supported in part by Croatian Ministry of Science
+# and Technology through the research contract #IP-2003-143.
+#
 
-# $Id: vm.tcl 63 2013-10-03 12:17:50Z valter $
+# $Id: vm.tcl 130 2015-02-24 09:52:19Z valter $
 
 
 #****h* imunes/vm.tcl
@@ -33,8 +36,8 @@
 #  This module is used to define all the vm specific procedures.
 # NOTES
 #  Procedures in this module start with the keyword vm and
-#  end with function specific part that is the same for all the node
-#  types that work on the same layer.
+#  end with function specific part that is the same for all the
+#  node types that work on the same layer.
 #****
 
 set MODULE vm
@@ -58,131 +61,32 @@ proc $MODULE.confNewNode { node_id } {
     global nodeNamingBase
 
     setNodeName $node_id [getNewNodeNameType vm $nodeNamingBase(vm)]
-    setAutoDefaultRoutesStatus $node_id "enabled"
-
-    set logiface_id [newLogIface $node_id "lo"]
-    setIfcIPv4addrs $node_id $logiface_id "127.0.0.1/8"
-    setIfcIPv6addrs $node_id $logiface_id "::1/128"
 }
 
 #****f* vm.tcl/vm.confNewIfc
 # NAME
 #   vm.confNewIfc -- configure new interface
 # SYNOPSIS
-#   vm.confNewIfc $node_id $iface_id
+#   vm.confNewIfc $node_id $ifc
 # FUNCTION
 #   Configures new interface for the specified node.
 # INPUTS
 #   * node_id -- node id
-#   * iface_id -- interface name
+#   * ifc -- interface name
 #****
-proc $MODULE.confNewIfc { node_id iface_id } {
-    autoIPv4addr $node_id $iface_id
-    autoIPv6addr $node_id $iface_id
-    autoMACaddr $node_id $iface_id
+proc $MODULE.confNewIfc { node_id ifc } {
 }
 
 proc $MODULE.generateConfigIfaces { node_id ifaces } {
-    set all_ifaces "[ifcList $node_id] [logIfcList $node_id]"
-    if { $ifaces == "*" } {
-	set ifaces $all_ifaces
-    } else {
-	# sort physical ifaces before logical ones (because of vlans)
-	set negative_ifaces [removeFromList $all_ifaces $ifaces]
-	set ifaces [removeFromList $all_ifaces $negative_ifaces]
-    }
-
-    set cfg {}
-    foreach iface_id $ifaces {
-	set cfg [concat $cfg [nodeCfggenIfc $node_id $iface_id]]
-
-	lappend cfg ""
-    }
-
-    return $cfg
 }
 
 proc $MODULE.generateUnconfigIfaces { node_id ifaces } {
-    set all_ifaces "[ifcList $node_id] [logIfcList $node_id]"
-    if { $ifaces == "*" } {
-	set ifaces $all_ifaces
-    } else {
-	# sort physical ifaces before logical ones
-	set negative_ifaces [removeFromList $all_ifaces $ifaces]
-	set ifaces [removeFromList $all_ifaces $negative_ifaces]
-    }
-
-    set cfg {}
-    foreach iface_id $ifaces {
-	set cfg [concat $cfg [nodeUncfggenIfc $node_id $iface_id]]
-
-	lappend cfg ""
-    }
-
-    return $cfg
 }
 
-#****f* vm.tcl/vm.generateConfig
-# NAME
-#   vm.generateConfig -- configuration generator
-# SYNOPSIS
-#   set config [vm.generateConfig $node_id]
-# FUNCTION
-#   Returns the generated configuration. This configuration represents
-#   the configuration loaded on the booting time of the virtual nodes
-#   and it is closly related to the procedure vm.bootcmd.
-#   For each interface in the interface list of the node, ip address is
-#   configured and each static route from the simulator is added.
-# INPUTS
-#   * node_id -- node id
-# RESULT
-#   * config -- generated configuration
-#****
 proc $MODULE.generateConfig { node_id } {
-    set cfg {}
-
-    if { [getCustomEnabled $node_id] != true || [getCustomConfigSelected $node_id "NODE_CONFIG"] in "\"\" DISABLED" } {
-	set cfg [concat $cfg [nodeCfggenStaticRoutes4 $node_id]]
-	set cfg [concat $cfg [nodeCfggenStaticRoutes6 $node_id]]
-
-	lappend cfg ""
-    }
-
-    set subnet_gws {}
-    set nodes_l2data [dict create]
-    if { [getAutoDefaultRoutesStatus $node_id] == "enabled" } {
-	lassign [getDefaultGateways $node_id $subnet_gws $nodes_l2data] my_gws subnet_gws nodes_l2data
-	lassign [getDefaultRoutesConfig $node_id $my_gws] all_routes4 all_routes6
-
-	setDefaultIPv4routes $node_id $all_routes4
-	setDefaultIPv6routes $node_id $all_routes6
-    } else {
-	setDefaultIPv4routes $node_id {}
-	setDefaultIPv6routes $node_id {}
-    }
-
-    set cfg [concat $cfg [nodeCfggenAutoRoutes4 $node_id]]
-    set cfg [concat $cfg [nodeCfggenAutoRoutes6 $node_id]]
-
-    lappend cfg ""
-
-    return $cfg
 }
 
 proc $MODULE.generateUnconfig { node_id } {
-    set cfg {}
-
-    set cfg [concat $cfg [nodeUncfggenStaticRoutes4 $node_id]]
-    set cfg [concat $cfg [nodeUncfggenStaticRoutes6 $node_id]]
-
-    lappend cfg ""
-
-    set cfg [concat $cfg [nodeUncfggenAutoRoutes4 $node_id]]
-    set cfg [concat $cfg [nodeUncfggenAutoRoutes6 $node_id]]
-
-    lappend cfg ""
-
-    return $cfg
 }
 
 #****f* vm.tcl/vm.ifacePrefix
@@ -196,21 +100,7 @@ proc $MODULE.generateUnconfig { node_id } {
 #   * name -- name prefix string
 #****
 proc $MODULE.ifacePrefix {} {
-    return "eth"
-}
-
-#****f* vm.tcl/vm.IPAddrRange
-# NAME
-#   vm.IPAddrRange -- IP address range
-# SYNOPSIS
-#   vm.IPAddrRange
-# FUNCTION
-#   Returns vm IP address range
-# RESULT
-#   * range -- vm IP address range
-#****
-proc $MODULE.IPAddrRange {} {
-    return 20
+    return "x"
 }
 
 #****f* vm.tcl/vm.netlayer
@@ -219,12 +109,12 @@ proc $MODULE.IPAddrRange {} {
 # SYNOPSIS
 #   set layer [vm.netlayer]
 # FUNCTION
-#   Returns the layer on which the vm communicates, i.e. returns NETWORK.
+#   Returns the layer on which the vm operates, i.e. returns LINK.
 # RESULT
-#   * layer -- set to NETWORK
+#   * layer -- set to LINK
 #****
 proc $MODULE.netlayer {} {
-    return NETWORK
+    return LINK
 }
 
 #****f* vm.tcl/vm.virtlayer
@@ -233,66 +123,39 @@ proc $MODULE.netlayer {} {
 # SYNOPSIS
 #   set layer [vm.virtlayer]
 # FUNCTION
-#   Returns the layer on which the vm is instantiated i.e. returns VIRTUALIZED.
+#   Returns the layer on which the vm node is instantiated,
+#   i.e. returns NATIVE.
 # RESULT
-#   * layer -- set to VIRTUALIZED
+#   * layer -- set to NATIVE
 #****
 proc $MODULE.virtlayer {} {
-    return VIRTUALIZED
-}
-
-#****f* vm.tcl/vm.bootcmd
-# NAME
-#   vm.bootcmd -- boot command
-# SYNOPSIS
-#   set appl [vm.bootcmd $node_id]
-# FUNCTION
-#   Procedure bootcmd returns the application that reads and employes the
-#   configuration generated in vm.generateConfig.
-#   In this case (procedure vm.bootcmd) specific application is /bin/sh
-# INPUTS
-#   * node_id -- node id
-# RESULT
-#   * appl -- application that reads the configuration (/bin/sh)
-#****
-proc $MODULE.bootcmd { node_id } {
-    return "/bin/sh"
-}
-
-#****f* vm.tcl/vm.shellcmds
-# NAME
-#   vm.shellcmds -- shell commands
-# SYNOPSIS
-#   set shells [vm.shellcmds]
-# FUNCTION
-#   Procedure shellcmds returns the shells that can be opened
-#   as a default shell for the system.
-# RESULT
-#   * shells -- default shells for the vm node
-#****
-proc $MODULE.shellcmds {} {
-    return "csh bash sh tcsh"
+    return NATIVE
 }
 
 #****f* vm.tcl/vm.nghook
 # NAME
-#   vm.nghook -- nghook
+#   vm.nghook
 # SYNOPSIS
 #   vm.nghook $eid $node_id $iface_id
 # FUNCTION
-#   Returns the id of the netgraph node and the name of the netgraph hook
-#   which is used for connecting two netgraph nodes. This procedure calls
-#   l3node.hook procedure and passes the result of that procedure.
+#   Returns the id of the netgraph node and the netgraph hook name. In this
+#   case netgraph node name correspondes to the name of the physical interface.
 # INPUTS
 #   * eid -- experiment id
 #   * node_id -- node id
 #   * iface_id -- interface id
 # RESULT
-#   * nghook -- the list containing netgraph node id and the
-#     netgraph hook (ngNode ngHook).
+#   * nghook -- the list containing netgraph node name and
+#     the netraph hook name (in this case: lower).
 #****
 proc $MODULE.nghook { eid node_id iface_id } {
-    return [list $node_id-[getIfcName $node_id $iface_id] ether]
+    set iface_name [getIfcName $node_id $iface_id]
+    set vlan [getIfcVlanTag $node_id $iface_id]
+    if { $vlan != "" && [getIfcVlanDev $node_id $iface_id] != "" } {
+	set iface_name ${iface_name}_$vlan
+    }
+
+    return [list $iface_name lower]
 }
 
 ################################################################################
@@ -305,27 +168,26 @@ proc $MODULE.nghook { eid node_id iface_id } {
 # SYNOPSIS
 #   vm.prepareSystem
 # FUNCTION
-#   Does nothing
+#   Loads ng_ether into the kernel.
 #****
 proc $MODULE.prepareSystem {} {
-    # nothing to do
+    catch { exec kldload ng_ether }
 }
 
 #****f* vm.tcl/vm.nodeCreate
 # NAME
-#   vm.nodeCreate -- nodeCreate
+#   vm.nodeCreate -- instantiate
 # SYNOPSIS
 #   vm.nodeCreate $eid $node_id
 # FUNCTION
-#   Creates a new virtualized vm node (using jails/docker).
+#   Procedure vm.nodeCreate puts real interface into promiscuous mode.
 # INPUTS
 #   * eid -- experiment id
 #   * node_id -- node id
 #****
 proc $MODULE.nodeCreate { eid node_id } {
     startVM $eid $node_id
-    prepareFilesystemForNode $node_id
-    createNodeContainer $node_id
+    setToRunning "${node_id}_running" true
 }
 
 #****f* vm.tcl/vm.nodeNamespaceSetup
@@ -340,7 +202,6 @@ proc $MODULE.nodeCreate { eid node_id } {
 #   * node_id -- node id
 #****
 proc $MODULE.nodeNamespaceSetup { eid node_id } {
-    attachToL3NodeNamespace $node_id
 }
 
 #****f* vm.tcl/vm.nodeInitConfigure
@@ -356,15 +217,35 @@ proc $MODULE.nodeNamespaceSetup { eid node_id } {
 #   * node_id -- node id
 #****
 proc $MODULE.nodeInitConfigure { eid node_id } {
-    configureICMPoptions $node_id
 }
 
 proc $MODULE.nodePhysIfacesCreate { eid node_id ifaces } {
-    nodePhysIfacesCreate $node_id $ifaces
+    # first deal with VLAN interfaces to avoid 'non-existant'
+    # interface error
+    set vlan_ifaces {}
+    set nonvlan_ifaces {}
+    foreach iface_id $ifaces {
+	if { [getIfcVlanDev $node_id $iface_id] != "" } {
+	    lappend vlan_ifaces $iface_id
+	} else {
+	    lappend nonvlan_ifaces $iface_id
+	}
+    }
+
+    foreach iface_id [concat $vlan_ifaces $nonvlan_ifaces] {
+	set link_id [getIfcLink $node_id $iface_id]
+	if { $link_id != "" && [getLinkDirect $link_id] } {
+	    # do direct link stuff
+	    captureExtIfc $eid $node_id $iface_id
+	} else {
+	    captureExtIfc $eid $node_id $iface_id
+	}
+
+	setToRunning "${node_id}|${iface_id}_running" true
+    }
 }
 
 proc $MODULE.nodeLogIfacesCreate { eid node_id ifaces } {
-    nodeLogIfacesCreate $node_id $ifaces
 }
 
 #****f* vm.tcl/vm.nodeIfacesConfigure
@@ -382,7 +263,6 @@ proc $MODULE.nodeLogIfacesCreate { eid node_id ifaces } {
 #   * ifaces -- list of interface ids
 #****
 proc $MODULE.nodeIfacesConfigure { eid node_id ifaces } {
-    startNodeIfaces $node_id $ifaces
 }
 
 #****f* vm.tcl/vm.nodeConfigure
@@ -397,9 +277,9 @@ proc $MODULE.nodeIfacesConfigure { eid node_id ifaces } {
 # INPUTS
 #   * eid -- experiment id
 #   * node_id -- node id
+#   * ifaces -- list of interface ids
 #****
 proc $MODULE.nodeConfigure { eid node_id } {
-    runConfOnNode $node_id
 }
 
 ################################################################################
@@ -421,20 +301,32 @@ proc $MODULE.nodeConfigure { eid node_id } {
 #   * ifaces -- list of interface ids
 #****
 proc $MODULE.nodeIfacesUnconfigure { eid node_id ifaces } {
-    unconfigNodeIfaces $eid $node_id $ifaces
 }
 
 proc $MODULE.nodeIfacesDestroy { eid node_id ifaces } {
-    nodeIfacesDestroy $eid $node_id $ifaces
+    if { $ifaces == "*" } {
+	set ifaces [ifcList $node_id]
+    }
+
+    foreach iface_id $ifaces {
+	set link_id [getIfcLink $node_id $iface_id]
+	if { $link_id != "" && [getLinkDirect $link_id] } {
+	    # do direct link stuff
+	    releaseExtIfc $eid $node_id $iface_id
+	} else {
+	    releaseExtIfc $eid $node_id $iface_id
+	}
+
+	setToRunning "${node_id}|${iface_id}_running" false
+    }
 }
 
 proc $MODULE.nodeUnconfigure { eid node_id } {
-    unconfigNode $eid $node_id
 }
 
 #****f* vm.tcl/vm.nodeShutdown
 # NAME
-#   vm.nodeShutdown -- layer 3 node shutdown
+#   vm.nodeShutdown -- layer 3 node nodeShutdown
 # SYNOPSIS
 #   vm.nodeShutdown $eid $node_id
 # FUNCTION
@@ -446,26 +338,19 @@ proc $MODULE.nodeUnconfigure { eid node_id } {
 #   * node_id -- node id
 #****
 proc $MODULE.nodeShutdown { eid node_id } {
-    killExtProcess "wireshark.*[getNodeName $node_id].*\\($eid\\)"
-    killAllNodeProcesses $eid $node_id
 }
 
 #****f* vm.tcl/vm.nodeDestroy
 # NAME
-#   vm.nodeDestroy -- layer 3 node destroy
+#   vm.nodeDestroy -- destroy
 # SYNOPSIS
 #   vm.nodeDestroy $eid $node_id
 # FUNCTION
-#   Destroys a vm node.
-#   First, it destroys all remaining virtual ifaces (vlans, tuns, etc).
-#   Then, it destroys the jail/container with its namespaces and FS.
+#   Destroys an vm emulation interface.
 # INPUTS
 #   * eid -- experiment id
 #   * node_id -- node id
 #****
 proc $MODULE.nodeDestroy { eid node_id } {
-    destroyNodeVirtIfcs $eid $node_id
-    removeNodeContainer $eid $node_id
-    destroyNamespace $eid-$node_id
-    removeNodeFS $eid $node_id
+    setToRunning "${node_id}_running" false
 }

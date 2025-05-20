@@ -450,7 +450,7 @@ proc getNodeNetns { eid node_id } {
     global devfs_number
 
     # Top-level experiment netns
-    if { $node_id in "" || [getNodeType $node_id] == "rj45" } {
+    if { $node_id in "" || [getNodeType $node_id] in "rj45 vm" } {
 	return $eid
     }
 
@@ -594,7 +594,7 @@ proc isNodeStarted { node_id } {
 
     set node_type [getNodeType $node_id]
     if { [$node_type.virtlayer] != "VIRTUALIZED" } {
-	if { $node_type in "rj45 ext extnat" } {
+	if { $node_type in "rj45 ext extnat vm" } {
 	    return true
 	}
 
@@ -623,7 +623,7 @@ proc isNodeStarted { node_id } {
 proc isNodeNamespaceCreated { node_id } {
     global skip_nodes
 
-    if { $node_id in $skip_nodes } {
+    if { $node_id in $skip_nodes || [getNodeType $node_id] in "vm" } {
 	return true
     }
 
@@ -819,7 +819,7 @@ proc configureICMPoptions { node_id } {
 proc isNodeInitNet { node_id } {
     global skip_nodes nodecreate_timeout
 
-    if { $node_id in $skip_nodes } {
+    if { $node_id in $skip_nodes || [getNodeType $node_id] in "vm" } {
 	return true
     }
 
@@ -912,6 +912,7 @@ proc createDirectLinkBetween { node1_id node2_id iface1_id iface2_id link_id } {
 
     # on Linux, there is no mechanism for rj45-rj45 direct links so we create a
     # bridge in the default namespace
+    #TODO
     if { "[getNodeType $node1_id] [getNodeType $node2_id]" == "rj45 rj45" } {
 	global devfs_number
 
@@ -1026,7 +1027,7 @@ proc createLinkBetween { node1_id node2_id iface1_id iface2_id link_id } {
 
     # add nodes iface hooks to link bridge and bring them up
     foreach node_id "$node1_id $node2_id" iface_id "$iface1_id $iface2_id" {
-	if { [getNodeType $node_id] == "rj45" } {
+	if { [getNodeType $node_id] in "rj45 vm" } {
 	    set iface_name [getIfcName $node_id $iface_id]
 	    if { [getIfcVlanDev $node_id $iface_id] != "" } {
 		set vlan [getIfcVlanTag $node_id $iface_id]
@@ -1054,7 +1055,7 @@ proc configureLinkBetween { node1_id node2_id iface1_id iface2_id link_id } {
 
     # FIXME: remove this to interface configuration?
     foreach node_id "$node1_id $node2_id" iface_id "$iface1_id $iface2_id" {
-	if { [getNodeType $node_id] == "rj45" } {
+	if { [getNodeType $node_id] in "rj45 vm" } {
 	    continue
 	}
 
@@ -1186,7 +1187,7 @@ proc unconfigNodeIfaces { eid node_id ifaces } {
 proc isNodeIfacesConfigured { node_id } {
     global skip_nodes ifacesconf_timeout
 
-    if { $node_id in $skip_nodes } {
+    if { $node_id in $skip_nodes || [getNodeType $node_id] in "vm" } {
 	return true
     }
 
@@ -1212,7 +1213,7 @@ proc isNodeIfacesConfigured { node_id } {
 proc isNodeConfigured { node_id } {
     global skip_nodes nodeconf_timeout
 
-    if { $node_id in $skip_nodes } {
+    if { $node_id in $skip_nodes || [getNodeType $node_id] in "vm" } {
 	return true
     }
 
@@ -1333,6 +1334,7 @@ proc killAllNodeProcesses { eid node_id } {
 }
 
 proc destroyDirectLinkBetween { eid node1_id node2_id link_id } {
+    #TODO
     if { "[getNodeType $node1_id] [getNodeType $node2_id]" == "rj45 rj45" } {
 	global devfs_number
 
@@ -1367,7 +1369,7 @@ proc nodeIfacesDestroy { eid node_id ifaces } {
 		pipesExec "ip -n $eid link del $node_id-[getIfcName $node_id $iface_id]" "hold"
 	    }
 	}
-    } elseif { $node_type == "rj45" } {
+    } elseif { $node_type in "rj45 vm" } {
 	foreach iface_id $ifaces {
 	    releaseExtIfcByName $eid [getIfcName $node_id $iface_id] $node_id
 	}
@@ -1951,7 +1953,7 @@ proc getNetemConfigLine { bandwidth delay loss dup } {
 proc configureIfcLinkParams { eid node_id iface_id bandwidth delay ber loss dup } {
     set devname [getIfcName $node_id $iface_id]
 
-    if { [getNodeType $node_id] != "rj45" } {
+    if { [getNodeType $node_id] ni "rj45 vm" } {
 	set devname $node_id-$devname
     }
 
@@ -2244,6 +2246,8 @@ proc startRoutingDaemons { node_id } {
 }
 
 proc startVM { eid node_id } {
+    global runtimeDir
+
     puts $node_id
     set node_cfg [cfgGet "nodes" $node_id]
     set vm_cfg [_getNodeVMConfig $node_cfg]
@@ -2252,6 +2256,7 @@ proc startVM { eid node_id } {
     set cpu_count [dict get $vm_cfg "cpu_count"]
 
     if { [dict get $vm_cfg "create_hdd"] } {
+        # tODO> kreirati hdd na lokaciji provided in the GUI 
         set size [dict get $vm_cfg "create_hdd_size"]
         # TODO: provjeri postoji li direktorij ([dirname $hdd_path])
         puts "vidi mene stvaram hdd velicine $size na $hdd_path"
@@ -2268,6 +2273,8 @@ proc startVM { eid node_id } {
     set args "$args -hda $hdd_path"
     set args "$args -cpu host"
     set args "$args --enable-kvm"
+    set args "$args -daemonize"
+
 
     foreach {iface_id iface_cfg} [cfgGet "nodes" $node_id "ifaces"] {
         set name [dict get $iface_cfg "name"]
@@ -2275,8 +2282,12 @@ proc startVM { eid node_id } {
         set args "$args -netdev tap,id=$name,ifname=$name,script=no,downscript=no -device virtio-net,netdev=$name,mac=$mac"
     }
 
+    set args "$args -qmp unix:$runtimeDir/$eid/imunes-socket,server,nowait" 
+
     puts "qemu-system-x86_64 $args"
     puts $node_cfg
+
+    pipesExec "qemu-system-x86_64 $args" "hold"
 }
 
 proc killVM { eid node_id } {
