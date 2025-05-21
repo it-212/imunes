@@ -2290,10 +2290,7 @@ proc startVM { eid node_id } {
     pipesExec "qemu-system-x86_64 $args" "hold"
 }
 
-proc killVM { eid node_id } {
-    set node_cfg [cfgGet "nodes" $node_id]
-    puts "$node_cfg" 
-    set cfg [_getNodeVMConfig $node_cfg]
-    
-    puts "$cfg" 
+proc powerOffVM { eid node_id } {
+    global runtimeDir
+    pipesExec "echo '{\"execute\": \"qmp_capabilities\"} {\"execute\": \"system_powerdown\"}' | sudo socat unix-connect:$runtimeDir/$eid/imunes-socket -" "hold"
 }

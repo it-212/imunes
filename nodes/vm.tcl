@@ -338,6 +338,7 @@ proc $MODULE.nodeUnconfigure { eid node_id } {
 #   * node_id -- node id
 #****
 proc $MODULE.nodeShutdown { eid node_id } {
+    powerOffVM $eid $node_id
 }
 
 #****f* vm.tcl/vm.nodeDestroy
