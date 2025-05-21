@@ -2282,8 +2282,9 @@ proc startVM { eid node_id } {
         set args "$args -netdev tap,id=$name,ifname=$name,script=no,downscript=no -device virtio-net,netdev=$name,mac=$mac"
     }
 
-    set args "$args -qmp unix:$runtimeDir/$eid/imunes-socket,server,nowait" 
+    set args "$args -qmp unix:$runtimeDir/$eid/control-socket,server,nowait" 
 
+    set args "$args -vnc unix:$runtimeDir/$eid/vnc-socket"
     puts "qemu-system-x86_64 $args"
     puts $node_cfg
 
@@ -2292,5 +2293,5 @@ proc startVM { eid node_id } {
 
 proc powerOffVM { eid node_id } {
     global runtimeDir
-    pipesExec "echo '{\"execute\": \"qmp_capabilities\"} {\"execute\": \"system_powerdown\"}' | sudo socat unix-connect:$runtimeDir/$eid/imunes-socket -" "hold"
+    pipesExec "echo '{\"execute\": \"qmp_capabilities\"} {\"execute\": \"system_powerdown\"}' | sudo socat unix-connect:$runtimeDir/$eid/control-socket -" "hold"
 }

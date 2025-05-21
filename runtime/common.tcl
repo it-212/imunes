@@ -860,12 +860,22 @@ proc setOperMode { new_oper_mode } {
 #   node.
 #****
 proc spawnShellExec {} {
+    set eid [getFromRunning "eid"]
     set node_id [lindex [.panwin.f1.c gettags {node && current}] 1]
     if { $node_id == "" } {
 	set node_id [lindex [.panwin.f1.c gettags {nodelabel && current}] 1]
 	if { $node_id == "" } {
 	    return
 	}
+    }
+
+    if { [getNodeType $node_id] == "vm" } {
+        global runtimeDir
+
+        puts "EVO MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+        puts "sudo vncviewer $runtimeDir/$eid/vnc-socket"
+        exec vncviewer $runtimeDir/$eid/vnc-socket &
+        return
     }
 
     if { [[getNodeType $node_id].virtlayer] != "VIRTUALIZED" || [getFromRunning "${node_id}_running"] == false } {
