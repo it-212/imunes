@@ -872,9 +872,7 @@ proc spawnShellExec {} {
     if { [getNodeType $node_id] == "vm" } {
         global runtimeDir
 
-        puts "EVO MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
-        puts "sudo vncviewer $runtimeDir/$eid/vnc-socket"
-        exec vncviewer $runtimeDir/$eid/vnc-socket &
+        exec vncviewer $runtimeDir/$eid/$node_id-vnc.socket &
         return
     }
 
